@@ -51,29 +51,49 @@ void loop() {
 void updateLEDs(int newTemperature) {
     static int lastLedsLit = 0; // Tracks how many LEDs were lit during the last update
     const int baseTemperature = 0; // Base temperature for calibration
-    int temperatureDifference = newTemperature - baseTemperature;
-    
+
+    // No LEDs should light up if the temperature is below 0 degrees
+    if (newTemperature < 0) {
+        for (int pin = 2; pin <= 11; pin++) {
+            digitalWrite(pin, LOW); // Turn off all LEDs
+        }
+        lastLedsLit = 0; // Reset the last LEDs lit count
+        return; // Exit the function early
+    }
+
+    // Round the temperature to the nearest 2-degree mark
+    int roundedTemperature = ((newTemperature + 1) / 2) * 2; // Adding 1 for proper rounding down or up
+    int temperatureDifference = roundedTemperature - baseTemperature;
+
     // Calculate the number of LEDs to light based on the 2-degree difference per LED
-    int ledsToLight = abs(temperatureDifference) / 2;
+    // Starting with at least 1 LED for temperatures >= 0
+    int ledsToLight = max(0, temperatureDifference / 2) + (roundedTemperature >= 0 ? 1 : 0);
     ledsToLight = min(ledsToLight, 10); // Assuming 10 LEDs, adjust according to your setup
 
-    if (newTemperature >= baseTemperature + lastLedsLit * 2) {
-        // If the temperature is higher than what was last represented, light up additional LEDs
-        for (int pin = 2 + lastLedsLit; pin < 2 + ledsToLight; pin++) {
+    // Light up or turn off LEDs based on the rounded temperature
+    if (roundedTemperature >= baseTemperature + (lastLedsLit - 1) * 2) {
+        for (int pin = 2; pin < 2 + ledsToLight; pin++) {
             digitalWrite(pin, HIGH);
             delay(100); // Visual effect
         }
-    } else if (newTemperature < baseTemperature + lastLedsLit * 2) {
-        // If the new temperature is lower, turn off LEDs from the last lit LED to the newly calculated level
-        for (int pin = 2 + lastLedsLit - 1; pin >= 2 + ledsToLight; pin--) {
+    } else if (roundedTemperature < baseTemperature + (lastLedsLit - 1) * 2) {
+        for (int pin = 2 + lastLedsLit; pin > 2 + ledsToLight; pin--) {
             digitalWrite(pin, LOW);
             delay(100); // Visual effect
         }
     }
-    
-    // Update the lastLedsLit for the next iteration based on the new temperature
+
+    // Turn off any LEDs beyond the current level
+    for (int pin = 2 + ledsToLight; pin <= 11; pin++) {
+        digitalWrite(pin, LOW);
+    }
+
+    // Update the lastLedsLit for the next iteration based on the new, rounded temperature
     lastLedsLit = ledsToLight;
 }
+
+
+
 
 
 
@@ -86,7 +106,7 @@ void pointToWindDirection(int windDirection) {
     delay(rotationTimeToDirection); // Delay for calculated duration
     servo1.write(92); // Stop the servo
 
-    delay(500); // Wait for a brief moment
+    delay(1000); // Wait for a brief moment
 
     // Slightly reduce the time for return rotation to prevent overshooting
     int adjustmentValue = 7; // Start with a small adjustment, increase if necessary
